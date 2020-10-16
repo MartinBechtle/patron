@@ -11,15 +11,16 @@ import (
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/sqs"
 	"github.com/aws/aws-sdk-go/service/sqs/sqsiface"
+	"github.com/google/uuid"
+	opentracing "github.com/opentracing/opentracing-go"
+	"github.com/prometheus/client_golang/prometheus"
+
 	"github.com/beatlabs/patron/component/async"
 	"github.com/beatlabs/patron/correlation"
 	"github.com/beatlabs/patron/encoding"
 	"github.com/beatlabs/patron/encoding/json"
 	"github.com/beatlabs/patron/log"
 	"github.com/beatlabs/patron/trace"
-	"github.com/google/uuid"
-	opentracing "github.com/opentracing/opentracing-go"
-	"github.com/prometheus/client_golang/prometheus"
 )
 
 type messageState string
@@ -135,9 +136,9 @@ type Factory struct {
 	queueName         string
 	queue             sqsiface.SQSAPI
 	queueURL          string
-	maxMessages       int64
-	pollWaitSeconds   int64
-	visibilityTimeout int64
+	maxMessages       *int64
+	pollWaitSeconds   *int64
+	visibilityTimeout *int64
 	buffer            int
 	statsInterval     time.Duration
 }
@@ -160,14 +161,12 @@ func NewFactory(queue sqsiface.SQSAPI, queueName string, oo ...OptionFunc) (*Fac
 	}
 
 	f := &Factory{
-		queueName:         queueName,
-		queueURL:          *url.QueueUrl,
-		queue:             queue,
-		maxMessages:       10,
-		pollWaitSeconds:   20,
-		visibilityTimeout: 30,
-		buffer:            0,
-		statsInterval:     10 * time.Second,
+		queueName:     queueName,
+		queueURL:      *url.QueueUrl,
+		queue:         queue,
+		maxMessages:   aws.Int64(10),
+		buffer:        0,
+		statsInterval: 10 * time.Second,
 	}
 
 	for _, o := range oo {
@@ -198,9 +197,9 @@ type consumer struct {
 	queueName         string
 	queueURL          string
 	queue             sqsiface.SQSAPI
-	maxMessages       int64
-	pollWaitSeconds   int64
-	visibilityTimeout int64
+	maxMessages       *int64
+	pollWaitSeconds   *int64
+	visibilityTimeout *int64
 	buffer            int
 	statsInterval     time.Duration
 	cnl               context.CancelFunc
@@ -220,10 +219,10 @@ func (c *consumer) Consume(ctx context.Context) (<-chan async.Message, <-chan er
 			}
 			log.Debugf("polling SQS queue %s for messages", c.queueName)
 			output, err := c.queue.ReceiveMessageWithContext(sqsCtx, &sqs.ReceiveMessageInput{
-				QueueUrl:            aws.String(c.queueURL),
-				MaxNumberOfMessages: aws.Int64(c.maxMessages),
-				WaitTimeSeconds:     aws.Int64(c.pollWaitSeconds),
-				VisibilityTimeout:   aws.Int64(c.visibilityTimeout),
+				QueueUrl:            &c.queueURL,
+				MaxNumberOfMessages: c.maxMessages,
+				WaitTimeSeconds:     c.pollWaitSeconds,
+				VisibilityTimeout:   c.visibilityTimeout,
 				AttributeNames: aws.StringSlice([]string{
 					sqsAttributeSentTimestamp,
 				}),
