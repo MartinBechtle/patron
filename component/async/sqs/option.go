@@ -13,7 +13,9 @@ type OptionFunc func(*Factory) error
 
 // MaxMessages option for setting the max number of messages fetched.
 // Allowed values are between 1 and 10.
-// If this option is unused, it defaults to 10.
+// If this option is unused, it defaults to 3.
+// If messages can be processed very quickly, maxing out this value is fine, otherwise having a high value is risky as it might trigger the visibility timeout.
+// Having a value too small isn't recommended either, as it increases the number of SQS API requests, thus AWS costs.
 func MaxMessages(maxMessages int64) OptionFunc {
 	return func(f *Factory) error {
 		if maxMessages <= 0 || maxMessages > 10 {
@@ -48,18 +50,6 @@ func VisibilityTimeout(visibilityTimeout int64) OptionFunc {
 			return fmt.Errorf("visibility timeout should be between 0 and %d seconds", twelveHoursInSeconds)
 		}
 		f.visibilityTimeout = &visibilityTimeout
-		return nil
-	}
-}
-
-// Buffer sets the concurrency of the messages processing.
-// 0 means wait for the previous messages to be processed.
-func Buffer(buffer int) OptionFunc {
-	return func(f *Factory) error {
-		if buffer < 0 {
-			return errors.New("buffer should be greater or equal to zero")
-		}
-		f.buffer = buffer
 		return nil
 	}
 }

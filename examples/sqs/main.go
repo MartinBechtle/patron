@@ -73,16 +73,23 @@ func sampleSqs() (*async.Component, error) {
 	}
 	sqsClient := sqs.New(sess)
 
+	concurrency := uint(10)
+
 	factory, err := patronsqs.NewFactory(
 		sqsClient,
 		sampleConfig.name,
-		// Optionally override the queue's default polling setting
+		// Optionally override the queue's default polling setting.
+		// Long polling is highly recommended to avoid large costs on AWS.
 		// See https://docs.aws.amazon.com/AWSSimpleQueueService/latest/SQSDeveloperGuide/sqs-short-and-long-polling.html
-		patronsqs.PollWaitSeconds(5),
+		// It's probably best to not specify any value: the default value on the queue will be used.
+		patronsqs.PollWaitSeconds(20),
 		// Optionally override the queue's default visibility timeout
 		// See https://docs.aws.amazon.com/AWSSimpleQueueService/latest/SQSDeveloperGuide/sqs-visibility-timeout.html
-		patronsqs.VisibilityTimeout(5),
-		patronsqs.Buffer(10),
+		// Again, a sensible default should be configured on the queue, but there might be specific use case where you want to override.
+		patronsqs.VisibilityTimeout(30),
+		// Optionally change the number of messages fetched by each worker.
+		// The default is 3
+		patronsqs.MaxMessages(5),
 	)
 	if err != nil {
 		return nil, err
@@ -95,11 +102,12 @@ func sampleSqs() (*async.Component, error) {
 		WithFailureStrategy(async.NackStrategy).
 		WithRetries(3).
 		WithRetryWait(30 * time.Second).
+		WithConcurrency(concurrency).
 		Create()
 }
 
 func messageHandler(message async.Message) error {
 	log.Info("Received message, payload:", string(message.Payload()))
-	time.Sleep(5 * time.Second)
+	time.Sleep(3 * time.Second) // useful to see concurrency in action
 	return nil
 }
