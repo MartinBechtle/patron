@@ -114,37 +114,6 @@ func TestVisibilityTimeout(t *testing.T) {
 	}
 }
 
-func TestBuffer(t *testing.T) {
-	type args struct {
-		buffer int
-	}
-	tests := map[string]struct {
-		args        args
-		expectedErr string
-	}{
-		"success": {
-			args: args{buffer: 5},
-		},
-		"negative message size": {
-			args:        args{buffer: -1},
-			expectedErr: "buffer should be greater or equal to zero",
-		},
-	}
-	for name, tt := range tests {
-		t.Run(name, func(t *testing.T) {
-			f, err := NewFactory(&stubQueue{}, "queue")
-			require.NoError(t, err)
-			err = Buffer(tt.args.buffer)(f)
-			if tt.expectedErr != "" {
-				assert.EqualError(t, err, tt.expectedErr)
-			} else {
-				assert.NoError(t, err)
-				assert.Equal(t, f.buffer, tt.args.buffer)
-			}
-		})
-	}
-}
-
 func TestQueueStatsInterval(t *testing.T) {
 	type args struct {
 		interval time.Duration
